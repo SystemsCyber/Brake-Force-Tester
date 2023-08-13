@@ -3,7 +3,9 @@
 #include <Cytron_SmartDriveDuo.h> // Motor Controller library from https://github.com/CytronTechnologies/Cytron_SmartDriveDuo
 #include "QuadEncoder.h" // Quadurature encoder library from Teensyduino
 
-//Input Pins Defenition
+#define loadSerial Serial1
+
+//Input Pins Definition
 #define EncoderA_pin 2
 #define EncoderB_pin 3
 #define IN1 4 // Teensy pin 4 is connected to (MDDS30) Motor Controller pin IN1.
@@ -93,12 +95,13 @@ const uint32_t ramp_time = 50; //milliseconds
 const uint32_t serial_RX_time = 1000;
 uint32_t run_time = 0; //milliseconds
 
+int millipounds;
 
 bool Timeout_Value = 0;
 
 void setup()
 {
-  delay(200);
+  loadSerial.begin(19200);
   ActuatorVelocity = 0;
   smartDriveDuo30.control(ActuatorVelocity, ActuatorVelocity);
   
@@ -152,12 +155,14 @@ void loop()
 
     // Read inputs
     readInputs();
+    
     // Get user input from User by Raspberry Pi over Serial
     while (Serial.available()) {
       
       serial_RX_timer = 0;
       Timeout_Value = 1;
       char inChar = Serial.read();
+      Serial.print(inChar);
       if (inChar == '0') {
         magnitude_increase = 0;
         ActuatorVelocity =0 ;
@@ -177,9 +182,7 @@ void loop()
       }
       else if (inChar == 'F'){
         //Read Force Value
-//        char buff[100] = {};
-//        Serial.readuntil('\n')
-//        millipounds = atoi(buff); 
+        millipounds = Serial.parseInt(); 
       }
       else {
         magnitude_increase = 0;
@@ -198,7 +201,10 @@ void loop()
 
     //check limits
     if (LimitApply_Value == PRESSED || SafetyApply_Value == PRESSED){ // Limit Switch Left
-      ActuatorVelocity = 0; 
+      if (ActuatorVelocity > 0){
+        ActuatorVelocity = 0;
+      }
+       
       BlueLED_state = HIGH;
     } 
     else{
@@ -207,7 +213,9 @@ void loop()
 
     //check limits
     if (LimitRetract_Value == PRESSED || SafetyRetract_Value == PRESSED){ // Limit Switch Right
-      ActuatorVelocity = 0;
+      if (ActuatorVelocity < 0) {
+        ActuatorVelocity = 0;
+      }
       GreenLED_state = HIGH;
     } 
     else{
@@ -285,7 +293,8 @@ void loop()
       Serial.printf("%d,",LimitRetract_Value);
       Serial.printf("%d,",LimitApply_Value);
       Serial.printf("%d,",Timeout_Value);
-      Serial.printf("%d\n",EmergencyStop_Value);
+      Serial.printf("%d,",EmergencyStop_Value);
+      Serial.printf("%d\n", millipounds);
     }
   } 
 }
